@@ -25,7 +25,6 @@
       "scope": "workspace"
     }
   ],
-
   "dictionaries": [
     "en-us",
     // special terms
@@ -44,6 +43,5 @@
     "user-dic",
     "project-dic"
   ],
-
   "useGitignore": true
 }

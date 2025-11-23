@@ -7,23 +7,23 @@
 # https://opensource.org/licenses/MIT
 
 
-##		General
-#	OS specific files
+##  General
+#   OS specific files
 .DS_Store
 thumbs.db
 
-#	logs, patches
+#   logs, patches
 *.log
 *.diff
 *.patch
 
-# 	history, cache
+#   history, cache
 .history/
 .cache/
 **/*cache
 
 
-#	backup/swap/temp
+#   backup/swap/temp
 $~*
 ~*
 *~
@@ -31,7 +31,7 @@ $~*
 *swp
 *lock
 
-#	.env files
+# .env files
 .env*
 .env.*
 
@@ -50,8 +50,8 @@ temp/
 tmp/
 
 
-##		Editor
-#	VSCode
+##  Editor
+#   VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
