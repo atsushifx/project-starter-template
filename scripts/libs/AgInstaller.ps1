@@ -6,18 +6,27 @@
 
 <#
 .SYNOPSIS
+    カンマ区切り文字列をパースして名前とIDを返します（純粋関数）
+
+.DESCRIPTION
+    "name,value"形式の文字列を受け取り、トリム済みの配列 @(name, value) を返します。
+#>
+function Split-PackageSpec {
+    param([string]$Package)
+    $Package.Split(",").Trim()
+}
+
+<#
+.SYNOPSIS
     eget用パラメータを生成します。
 
 .DESCRIPTION
     "name,repo"形式の文字列を受け取り、egetに渡すパラメータ（--to, リポジトリ名, --asset）を返します。
 #>
 function AgInstaller-EgetBuildParams {
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Package
-    )
-    ($name, $repo) = $Package.Split(",").trim()
-    return @("--to", "c:/app/$name.exe", $repo, "--asset", '".xz"')
+    param([string]$Package)
+    $name, $repo = Split-PackageSpec $Package
+    @("--to", "c:/app/$name.exe", $repo, "--asset", '".xz"')
 }
 
 <#
@@ -28,13 +37,21 @@ function AgInstaller-EgetBuildParams {
     "name,id"形式の文字列を受け取り、winget installに渡す `--id` と `--location` を返します。
 #>
 function AgInstaller-WinGetBuildParams {
+    param([string]$Package)
+    $name, $id = Split-PackageSpec $Package
+    @("--id", $id, "--location", "c:/app/develop/utils/$name")
+}
+
+<#
+.SYNOPSIS
+    有効なパッケージ行のみをフィルタします（純粋関数）
+#>
+function Filter-ValidPackages {
     [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Package
-    )
-    ($name, $id) = $Package.Split(",").trim()
-    return @("--id", $id, "--location", "c:/app/develop/utils/$name")
+    param([Parameter(ValueFromPipeline = $true)][string]$Package)
+    process {
+        ($Package -and ($Package -notmatch '^\s*#')) ? $Package : $null
+    }
 }
 
 <#
@@ -59,28 +76,30 @@ function Install-WinGetPackages {
         [string[]]$Packages
     )
 
-    begin { $pkgList = @() }
+    begin {
+        $pkgList = @()
+        $hasPackages = $false
+    }
     process {
-        foreach ($pkg in $Packages) {
-            if ($pkg -and ($pkg -notmatch '^\s*#')) {
-                $pkgList += $pkg
-            }
+        $validPkgs = $Packages | Filter-ValidPackages
+        if ($validPkgs) {
+            $pkgList += $validPkgs
+            $hasPackages = $true
         }
     }
     end {
-        if ($pkgList.Count -eq 0) {
+        if (-not $hasPackages) {
             Write-Warning "📭 No valid packages to install via winget."
             return
         }
 
-        foreach ($pkg in $pkgList) {
-            $args = AgInstaller-WinGetBuildParams -Package $pkg
-            Write-Host "🔧 Installing $pkg → winget $($args -join ' ')" -ForegroundColor Cyan
-            $args2 = @("install") + $args
+        $pkgList | ForEach-Object {
+            $args = AgInstaller-WinGetBuildParams $_
+            Write-Host "🔧 Installing $_ → winget $($args -join ' ')" -ForegroundColor Cyan
             try {
-                Start-Process "winget" -ArgumentList $args2 -Wait -NoNewWindow -ErrorAction Stop
+                Start-Process "winget" -ArgumentList (@("install") + $args) -Wait -NoNewWindow -ErrorAction Stop
             } catch {
-                Write-Warning "❌ インストールに失敗しました: $pkg"
+                Write-Warning "❌ インストールに失敗しました: $_"
             }
         }
         Write-Host "✅ winget packages installed." -ForegroundColor Green
@@ -110,23 +129,26 @@ function Install-ScoopPackages {
         [string[]]$Tools
     )
 
-    begin { $toolList = @() }
+    begin {
+        $toolList = @()
+        $hasTools = $false
+    }
     process {
-        foreach ($tool in $Tools) {
-            if ($tool -and ($tool -notmatch '^\s*#')) {
-                $toolList += $tool
-            }
+        $validTools = $Tools | Filter-ValidPackages
+        if ($validTools) {
+            $toolList += $validTools
+            $hasTools = $true
         }
     }
     end {
-        if ($toolList.Count -eq 0) {
+        if (-not $hasTools) {
             Write-Warning "📭 No valid tools to install via scoop."
             return
         }
 
-        foreach ($tool in $toolList) {
-            Write-Host "🔧 Installing: $tool" -ForegroundColor Cyan
-            scoop install $tool
+        $toolList | ForEach-Object {
+            Write-Host "🔧 Installing: $_" -ForegroundColor Cyan
+            scoop install $_
         }
         Write-Host "✅ Scoop tools installed." -ForegroundColor Green
     }
@@ -154,21 +176,24 @@ function Install-PnpmPackages {
         [string[]]$Packages
     )
 
-    begin { $pkgList = @() }
+    begin {
+        $pkgList = @()
+        $hasPackages = $false
+    }
     process {
-        foreach ($pkg in $Packages) {
-            if ($pkg -and ($pkg -notmatch '^\s*#')) {
-                $pkgList += $pkg
-            }
+        $validPkgs = $Packages | Filter-ValidPackages
+        if ($validPkgs) {
+            $pkgList += $validPkgs
+            $hasPackages = $true
         }
     }
     end {
-        if ($pkgList.Count -eq 0) {
+        if (-not $hasPackages) {
             Write-Warning "📭 No valid packages to install."
             return
         }
 
-        $cmd = "pnpm add --global " + ($pkgList -join " ")
+        $cmd = "pnpm add --global $($pkgList -join ' ')"
         Write-Host "📦 Installing via pnpm: $cmd" -ForegroundColor Cyan
         Invoke-Expression $cmd
         Write-Host "✅ pnpm packages installed." -ForegroundColor Green
@@ -197,27 +222,30 @@ function Install-EgetPackages {
         [string[]]$Packages
     )
 
-    begin { $pkgList = @() }
+    begin {
+        $pkgList = @()
+        $hasPackages = $false
+    }
     process {
-        foreach ($pkg in $Packages) {
-            if ($pkg -and ($pkg -notmatch '^\s*#')) {
-                $pkgList += $pkg
-            }
+        $validPkgs = $Packages | Filter-ValidPackages
+        if ($validPkgs) {
+            $pkgList += $validPkgs
+            $hasPackages = $true
         }
     }
     end {
-        if ($pkgList.Count -eq 0) {
+        if (-not $hasPackages) {
             Write-Warning "📭 No valid packages to install via eget."
             return
         }
 
-        foreach ($pkg in $pkgList) {
-            $args = AgInstaller-EgetBuildParams -Package $pkg
-            Write-Host "🔧 Installing $pkg → eget $($args -join ' ')" -ForegroundColor Cyan
+        $pkgList | ForEach-Object {
+            $args = AgInstaller-EgetBuildParams $_
+            Write-Host "🔧 Installing $_ → eget $($args -join ' ')" -ForegroundColor Cyan
             try {
                 Start-Process "eget" -ArgumentList $args -Wait -NoNewWindow -ErrorAction Stop
             } catch {
-                Write-Warning "❌ インストールに失敗しました: $pkg"
+                Write-Warning "❌ インストールに失敗しました: $_"
             }
         }
         Write-Host "✅ eget packages installed." -ForegroundColor Green
