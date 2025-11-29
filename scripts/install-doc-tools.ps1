@@ -34,6 +34,63 @@ Set-StrictMode -Version Latest
 #endregion
 
 #region Functions
+# Pure function: ベースディレクトリ取得（VSCode判定を統一）
+function Get-BaseDirectory {
+    param([string]$RootDir, [string]$Item)
+    ($Item -ieq ".vscode") ? $RootDir : (Join-Path $RootDir "configs")
+}
+
+# Pure function: パス情報を生成
+function New-CopyPathInfo {
+    param(
+        [string]$Item,
+        [string]$TemplateDir,
+        [string]$DestinationDir
+    )
+
+    $srcBase = Get-BaseDirectory $TemplateDir $Item
+    $dstBase = Get-BaseDirectory $DestinationDir $Item
+
+    @{
+        Item = $Item
+        Source = Join-Path $srcBase $Item
+        Destination = Join-Path $dstBase $Item
+    }
+}
+
+# IO function: ディレクトリコピー実行
+function Copy-Directory {
+    param($PathInfo)
+    Write-Host "📁 Copying directory: $($PathInfo.Item) → $($PathInfo.Destination)"
+    robocopy $PathInfo.Source $PathInfo.Destination /E /NFL /NDL /NJH /NJS /NC /NS | Out-Null
+    Write-Host "✅ Directory copied: $($PathInfo.Item)"
+}
+
+# IO function: ファイルコピー実行
+function Copy-File {
+    param($PathInfo)
+    Copy-Item $PathInfo.Source -Destination $PathInfo.Destination
+    Write-Host "📝 Copied file: $($PathInfo.Item) → $($PathInfo.Destination)"
+}
+
+# IO function: アイテムコピー実行
+function Copy-ConfigItem {
+    param($PathInfo)
+
+    if (-not (Test-Path $PathInfo.Source)) {
+        Write-Warning "⚠️ Not found in templates: $($PathInfo.Item)"
+        return
+    }
+
+    if (Test-Path $PathInfo.Destination) {
+        Write-Host "🔁 Skipped (exists): $($PathInfo.Item)"
+        return
+    }
+
+    (Get-Item $PathInfo.Source).PSIsContainer ? (Copy-Directory $PathInfo) : (Copy-File $PathInfo)
+}
+
+# Main function: パイプライン処理でコピー実行
 function Copy-LinterConfigs {
 <#
 .SYNOPSIS
@@ -51,7 +108,7 @@ function Copy-LinterConfigs {
 #>
     [CmdletBinding()]
     param (
-        [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
+        [Parameter(ValueFromPipeline = $true)]
         [string[]]$Items,
 
         [string]$TemplateDir = "./templates",
@@ -59,54 +116,19 @@ function Copy-LinterConfigs {
     )
 
     begin {
-        $targets = @()
-    }
-
-    process {
-        foreach ($i in $Items) {
-            if ($i -and ($i -notmatch '^\s*#')) {
-                $targets += $i
-            }
-        }
-    }
-
-    end {
-        # create configs directory if needed
+        # configs ディレクトリ作成
         $configPath = Join-Path $DestinationDir "configs"
         if (-not (Test-Path $configPath)) {
             New-Item -Path $configPath -ItemType Directory | Out-Null
             Write-Host "📁 Created configs directory: $configPath"
         }
+    }
 
-        # Copy configs
-        foreach ($item in $targets) {
-            $src = Join-Path $TemplateDir $item
-
-            $dstBase = if ($item -ieq ".vscode") {
-                $DestinationDir  # 直下にコピー
-            } else {
-                Join-Path $DestinationDir "configs"
-            }
-
-            $dst = Join-Path $dstBase $item
-
-            if (Test-Path $src) {
-                if (-not (Test-Path $dst)) {
-                    if ((Get-Item $src).PSIsContainer) {
-                        Write-Host "📁 Copying directory: $item → $dst"
-                        robocopy $src $dst /E /NFL /NDL /NJH /NJS /NC /NS | Out-Null
-                        Write-Host "✅ Directory copied: $item"
-                    } else {
-                        Copy-Item $src -Destination $dst
-                        Write-Host "📝 Copied file: $item → $dst"
-                    }
-                } else {
-                    Write-Host "🔁 Skipped (exists): $item"
-                }
-            } else {
-                Write-Warning "⚠️ Not found in templates: $item"
-            }
-        }
+    process {
+        $Items `
+        | Where-Object { $_ -and ($_ -notmatch '^\s*#') } `
+        | ForEach-Object { New-CopyPathInfo $_ $TemplateDir $DestinationDir } `
+        | ForEach-Object { Copy-ConfigItem $_ }
     }
 }
 #endregion
@@ -122,6 +144,7 @@ function main {
         "textlint-filter-rule-comments",
         "textlint-rule-preset-ja-technical-writing",
         "textlint-rule-preset-ja-spacing",
+        "@textlint-ja/textlint-rule-preset-ai-writing",
         "textlint-rule-ja-no-orthographic-variants",
         "@textlint-ja/textlint-rule-no-synonyms",
         "sudachi-synonyms-dictionary",
@@ -142,7 +165,7 @@ function main {
     if (Test-Path $TemplateDir) {
         @(
             # textlint settings
-            ".textlintrc.yaml",
+            "textlintrc.yaml",
             ".textlint",
 
             # markdownlint

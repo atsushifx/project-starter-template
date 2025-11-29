@@ -8,6 +8,22 @@
 Set-Variable -Name "DEVMODE_REGPATH" -Option Constant -Value "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
 Set-Variable -Name "DEVMODE_VALUE_NAME" -Option Constant -Value "AllowDevelopmentWithoutDevLicense"
 
+## レジストリ値取得（純粋関数的アプローチ）
+function Get-DevModeRegistryValue {
+<#
+.SYNOPSIS
+    開発者モードのレジストリ値を安全に取得します（純粋関数）
+
+.DESCRIPTION
+    レジストリから値を取得し、エラー時は $null を返します。
+#>
+    try {
+        (Get-ItemProperty -Path $DEVMODE_REGPATH -Name $DEVMODE_VALUE_NAME -ErrorAction Stop).$DEVMODE_VALUE_NAME
+    } catch {
+        $null
+    }
+}
+
 ## モード取得
 function AgDevMode-GetMode {
 <#
@@ -25,11 +41,18 @@ function AgDevMode-GetMode {
 .NOTES
     定数: $DEVMODE_REGPATH, $DEVMODE_VALUE_NAME を使用
 #>
-    try {
-        $value = Get-ItemProperty -Path $DEVMODE_REGPATH -Name $DEVMODE_VALUE_NAME -ErrorAction Stop
-        return ($value.$DEVMODE_VALUE_NAME -eq 1)
-    } catch {
-        return $false
+    $value = Get-DevModeRegistryValue
+    ($null -ne $value) -and ($value -eq 1)
+}
+
+## レジストリキー確保（副作用関数）
+function Ensure-DevModeRegistryPath {
+<#
+.SYNOPSIS
+    開発者モード用のレジストリキーが存在することを保証します
+#>
+    if (-not (Test-Path $DEVMODE_REGPATH)) {
+        New-Item -Path $DEVMODE_REGPATH -Force | Out-Null
     }
 }
 
@@ -53,14 +76,9 @@ function AgDevMode-SetMode {
 .NOTES
     定数: $DEVMODE_REGPATH, $DEVMODE_VALUE_NAME を使用
 #>
-    param(
-        [switch]$Enable = $true
-    )
+    param([switch]$Enable = $true)
 
-    if (-not (Test-Path $DEVMODE_REGPATH)) {
-        New-Item -Path $DEVMODE_REGPATH -Force | Out-Null
-    }
-
-    $value = if ($Enable) { 1 } else { 0 }
+    Ensure-DevModeRegistryPath
+    $value = $Enable ? 1 : 0
     Set-ItemProperty -Path $DEVMODE_REGPATH -Name $DEVMODE_VALUE_NAME -Value $value -ErrorAction Stop
 }
