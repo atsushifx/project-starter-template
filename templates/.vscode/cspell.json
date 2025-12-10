@@ -12,7 +12,7 @@
     "${env:XDG_CONFIG_HOME}/vscode/cspell.config.json"
   ],
   "language": "en",
-  "caseSensitive": true,
+  "caseSensitive": false,
   "dictionaryDefinitions": [
     {
       "name": "project-dic",
