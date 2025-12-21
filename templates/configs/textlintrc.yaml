@@ -27,7 +27,6 @@ rules:
     ja-no-mixed-period:
       allowPeriodMarks:
         - ":"
-        - "✨"
     no-doubled-joshi:
       strict: false
   "@textlint-ja/preset-ai-writing": true
@@ -45,3 +44,4 @@ rules:
   prh:
     rulePaths:
       - ./.textlint/dict/prh.yml
+      - ./.textlint/dict/prh-my-settings.yml
