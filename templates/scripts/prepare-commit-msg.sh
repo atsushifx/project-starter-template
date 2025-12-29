@@ -80,11 +80,11 @@ FLAG_OUTPUT_TO_STDOUT=true
 
 ##
 # @description AI model name for commit message generation (default: sonnet)
-DEFAULT_AI_MODEL="sonnet"
+DEFAULT_AI_MODEL="gpt-5.2"
 
 ###
 # @description AI model name for commit message generation (default: sonnet)
-AI_MODEL="sonnet"
+AI_MODEL="gpt-5.2"
 
 ##
 # @description Path to commit message generator template
@@ -102,6 +102,42 @@ declare -a AI_COMMAND=()
 # ============================================================================
 # Functions
 # ============================================================================
+
+##
+# @description Display usage information and help message
+# @stdout Help message in standard format
+# @return Always exits with 0
+# @example
+#   display_help
+display_help() {
+  local script_name
+  script_name=$(basename "$0")
+  cat <<EOF
+Usage: $script_name [OPTIONS] [commit_msg_file]
+
+Generate Conventional Commits format messages by analyzing staged changes
+and recent commit history using AI.
+
+Options:
+  --git-buffer, --to-buffer   Output to Git commit buffer (default: stdout)
+  --model MODEL               AI model name (default: sonnet)
+                              Supported: gpt-*, o1-*, claude-*, haiku, sonnet, opus
+  -h, --help                  Show this help message
+
+Arguments:
+  [commit_msg_file]           Git commit message file (default: .git/COMMIT_EDITMSG)
+
+Examples:
+  # Output to stdout
+  $script_name
+
+  # Output to Git buffer with specific model
+  $script_name --git-buffer --model claude-sonnet-4-5
+
+  # Custom commit message file
+  $script_name /path/to/COMMIT_EDITMSG
+EOF
+}
 
 ##
 # @description Parse command-line options and set configuration
@@ -133,31 +169,7 @@ parse_options() {
         shift 2
         ;;
       --help|-h)
-        cat <<EOF
-Usage: $(basename "$0") [OPTIONS] [commit_msg_file]
-
-Generate Conventional Commits format messages by analyzing staged changes
-and recent commit history using AI.
-
-Options:
-  --git-buffer, --to-buffer   Output to Git commit buffer (default: stdout)
-  --model MODEL               AI model name (default: sonnet)
-                              Supported: gpt-*, o1-*, claude-*, haiku, sonnet, opus
-  -h, --help                  Show this help message
-
-Arguments:
-  [commit_msg_file]           Git commit message file (default: .git/COMMIT_EDITMSG)
-
-Examples:
-  # Output to stdout
-  $(basename "$0")
-
-  # Output to Git buffer with specific model
-  $(basename "$0") --git-buffer --model claude-sonnet-4-5
-
-  # Custom commit message file
-  $(basename "$0") /path/to/COMMIT_EDITMSG
-EOF
+        display_help
         exit 0
         ;;
       -*)
@@ -381,7 +393,7 @@ output_commit_message() {
     # Write to file (Git hook mode)
     rm -f "${output_file}"
     echo "${commit_msg}" > "${output_file}"
-    echo "✓ Commit message written to $output_file" >&2
+    echo "[OK] Commit message written to $output_file" >&2
   fi
 }
 
@@ -399,7 +411,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   # Skip generation if commit message was previously generated
   if [[ "$FLAG_OUTPUT_TO_STDOUT" == false && -f "$GIT_COMMIT_MSG" ]]; then
     if has_existing_message "$GIT_COMMIT_MSG"; then
-      echo "✓ Detected existing Git-generated commit message. Skipping generation." >&2
+      echo "[OK] Detected existing Git-generated commit message. Skipping generation." >&2
       exit 0
     fi
   fi
