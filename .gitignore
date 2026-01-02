@@ -41,16 +41,21 @@ $~*
 # SDD (Spec-Driven Development) files
 **/.cc-sdd/
 
-# CLAUDE.md
+# claude code
 .claude/*
+!.claude/agents/
+!.claude/agents/**
+
 
 # MCP server dependency files
 .serena/
 .lsmcp/
 
-## Temporary Directory
+## Temporary directories are never tracked
 temp/
 tmp/
+**/temp/
+**/tmp/
 
 
 ##  Editor
