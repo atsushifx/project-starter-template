@@ -41,11 +41,12 @@ $~*
 # SDD (Spec-Driven Development) files
 **/.cc-sdd/
 
-# claude code
+# claude code setting
 .claude/*
+
+# agents can tracking
 !.claude/agents/
 !.claude/agents/**
-
 
 # MCP server dependency files
 .serena/
