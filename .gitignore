@@ -41,8 +41,11 @@ $~*
 # SDD (Spec-Driven Development) files
 **/.cc-sdd/
 
-# CLAUDE.md
+# claude code
 .claude/*
+!.claude/agent/
+!.claude/agent/*
+
 
 # MCP server dependency files
 .serena/
