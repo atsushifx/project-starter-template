@@ -43,17 +43,19 @@ $~*
 
 # claude code
 .claude/*
-!.claude/agent/
-!.claude/agent/*
+!.claude/agents/
+!.claude/agents/**
 
 
 # MCP server dependency files
 .serena/
 .lsmcp/
 
-## Temporary Directory
+## Temporary directories are never tracked
 temp/
 tmp/
+**/temp/
+**/tmp/
 
 
 ##  Editor
